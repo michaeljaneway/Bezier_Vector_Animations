@@ -5,6 +5,9 @@ from typing import *
 from random import randint
 
 ORDER_COLOURS = {
+    7: "brown",
+    6: "magenta",
+    5: "yellow",
     4: "pink",
     3: "blue",
     2: "green"
@@ -108,16 +111,17 @@ class BezierAnimation:
                                                     10, counter_x, self.HEIGHT - 50, fill='black', center=True, looping_anim=True)
 
     def generate_structure(self):
-        obj_list = []
-        
         def recursive_generate(b_points):
             order = len(b_points) - 1
 
             if order <= 1:
                 return
+            
+            recursive_generate(b_points[:-1])
+            recursive_generate(b_points[1:])
 
             # First Circle Array: b_points[:-1]
-            # Second Circle Array: b_points[:-1]
+            # Second Circle Array: b_points[1:]
 
             first_tools_path = path_from_polybezier(
                 b_points[:-1], self.resolution)
@@ -171,17 +175,13 @@ class BezierAnimation:
             second_circle.add_attribute_key_sequence("cy", times, second_circle_positions_y, animation_args={
                 "repeatCount": "indefinite"})
 
-            obj_list.append(first_circle)
-            obj_list.append(second_circle)
-            obj_list.append(line)
+            self.d.append(first_circle)
+            self.d.append(second_circle)
+            self.d.append(line)
 
-            recursive_generate(b_points[:-1])
-            recursive_generate(b_points[1:])
+            
 
         recursive_generate(self.bpoints)
-        
-        for drawable in obj_list[::-1]:
-            self.d.append(drawable)
 
     def generate_red_bezier(self):
         bezier_path = path_from_polybezier(self.bpoints, self.resolution)
@@ -219,7 +219,7 @@ class BezierAnimation:
 
 
 if __name__ == "__main__":
-    test_bpoints = [50+120j, 20+20j, 150+20j, 250+120j, 300+34j]
+    test_bpoints = [200+200j, 250+0j, 300+100j, 350+90j, 400+110j, 340+200j]
 
     b = BezierAnimation("bezier 4.svg", 10.0, test_bpoints,
-                        resolution=1000, frame_count=1000)
+                        resolution=1000, frame_count=100)
