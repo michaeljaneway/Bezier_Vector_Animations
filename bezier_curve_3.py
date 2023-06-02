@@ -131,7 +131,6 @@ blue_line_vals = []
 
 blue_line = draw.Path(stroke="blue",
                      stroke_width=2, fill="none", stroke_linecap="round")
-# blue_line.add_attribute_key_sequence("d", times, )
 
 d.append(blue_1_circle)
 d.append(blue_2_circle)
