@@ -7,7 +7,7 @@ from random import randint
 ORDER_COLOURS = {
     4: "pink",
     3: "blue",
-    2: "yellow"
+    2: "green"
 }
 
 
@@ -89,13 +89,13 @@ class BezierAnimation:
 
     def generate_counter(self):
         # Create times and values lists
-        times, counter_values = [],[]
-        
+        times, counter_values = [], []
+
         for i in range(0, self.frame_count + 1):
             t = (i/self.frame_count)
             time = t * self.dur
             counter_value = "t=" + str(t).removeprefix("0")
-                        
+
             times.append(time)
             counter_values.append(counter_value)
 
@@ -108,38 +108,80 @@ class BezierAnimation:
                                                     10, counter_x, self.HEIGHT - 50, fill='black', center=True, looping_anim=True)
 
     def generate_structure(self):
+        obj_list = []
+        
         def recursive_generate(b_points):
             order = len(b_points) - 1
-            
+
             if order <= 1:
                 return
-            
+
             # First Circle Array: b_points[:-1]
             # Second Circle Array: b_points[:-1]
-            
-            first_tools_path = path_from_polybezier(b_points[:-1], self.resolution)
-            second_tools_path = path_from_polybezier(b_points[1:], self.resolution)
-            
+
+            first_tools_path = path_from_polybezier(
+                b_points[:-1], self.resolution)
+            second_tools_path = path_from_polybezier(
+                b_points[1:], self.resolution)
+
             first_path = draw.Path(first_tools_path.d())
             second_path = draw.Path(second_tools_path.d())
 
-            first_circle = draw.Circle(0, 0, 4, fill="black")
-            first_circle.append_anim(draw.AnimateMotion(
-                first_path, '%ds' % (self.dur), repeatCount='indefinite'))
-            
-            second_circle = draw.Circle(0, 0, 4, fill="black")
-            second_circle.append_anim(draw.AnimateMotion(
-                second_path, '%ds' % (self.dur), repeatCount='indefinite'))
-            
-            self.d.append(first_circle)
-            self.d.append(second_circle)
-            
+            def d_at_t(t: float):
+                point1: complex = first_tools_path.point(t)
+                point2: complex = second_tools_path.point(t)
+
+            times, d_vals = [], []
+            first_circle_positions_x, second_circle_positions_x = [],[]
+            first_circle_positions_y, second_circle_positions_y = [],[]
+
+            for i in range(0, self.frame_count + 1):
+                t = (i/self.frame_count)
+                time = t * self.dur
+
+                point1: complex = first_tools_path.point(t)
+                point2: complex = second_tools_path.point(t)
+
+                d_val = "M%lf,%lf L%lf,%lf" % (
+                    point1.real, point1.imag, point2.real, point2.imag)
+
+                times.append(time)
+                d_vals.append(d_val)
+                
+                first_circle_positions_x.append(point1.real)
+                first_circle_positions_y.append(point1.imag)
+                
+                second_circle_positions_x.append(point2.real)
+                second_circle_positions_y.append(point2.imag)
+
+            line = draw.Path(d_at_t(
+                0), fill="none", stroke=ORDER_COLOURS[order], stroke_opacity="20%", stroke_width=2, pathLength="10", stroke_linecap="round")
+            line.add_attribute_key_sequence("d", times, d_vals, animation_args={
+                "repeatCount": "indefinite"})
+
+            first_circle = draw.Circle(0, 0, 4, fill=ORDER_COLOURS[order])
+            first_circle.add_attribute_key_sequence("cx", times, first_circle_positions_x, animation_args={
+                "repeatCount": "indefinite"})
+            first_circle.add_attribute_key_sequence("cy", times, first_circle_positions_y, animation_args={
+                "repeatCount": "indefinite"})
+
+            second_circle = draw.Circle(0, 0, 4, fill=ORDER_COLOURS[order])
+            second_circle.add_attribute_key_sequence("cx", times, second_circle_positions_x, animation_args={
+                "repeatCount": "indefinite"})
+            second_circle.add_attribute_key_sequence("cy", times, second_circle_positions_y, animation_args={
+                "repeatCount": "indefinite"})
+
+            obj_list.append(first_circle)
+            obj_list.append(second_circle)
+            obj_list.append(line)
+
             recursive_generate(b_points[:-1])
             recursive_generate(b_points[1:])
-            
+
         recursive_generate(self.bpoints)
         
-
+        for drawable in obj_list[::-1]:
+            self.d.append(drawable)
 
     def generate_red_bezier(self):
         bezier_path = path_from_polybezier(self.bpoints, self.resolution)
@@ -179,4 +221,5 @@ class BezierAnimation:
 if __name__ == "__main__":
     test_bpoints = [50+120j, 20+20j, 150+20j, 250+120j, 300+34j]
 
-    b = BezierAnimation("bezier 4.svg", 10.0, test_bpoints, resolution=100, frame_count=50)
+    b = BezierAnimation("bezier 4.svg", 10.0, test_bpoints,
+                        resolution=1000, frame_count=1000)
