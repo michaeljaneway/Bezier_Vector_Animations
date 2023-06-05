@@ -8,7 +8,7 @@ ORDER_COLOURS = {
     7: "brown",
     6: "magenta",
     5: "yellow",
-    4: "pink",
+    4: "#D16587",
     3: "blue",
     2: "green"
 }
@@ -46,14 +46,16 @@ def path_to_rounded_d(path=svgtools.path,  useSandT=False, use_closed_attrib=Fal
                 _seg_start = seg_start - current_pos if current_pos is not None else seg_start
             else:
                 _seg_start = seg_start
-            parts.append('M {:.2f},{:.2f}'.format(_seg_start.real, _seg_start.imag))
+            parts.append('M {:.2f},{:.2f}'.format(
+                _seg_start.real, _seg_start.imag))
 
         if isinstance(segment, svgtools.Line):
             if rel:
                 _seg_end = segment.end - seg_start
             else:
                 _seg_end = segment.end
-            parts.append('L {:.2f},{:.2f}'.format(_seg_end.real, _seg_end.imag))
+            parts.append('L {:.2f},{:.2f}'.format(
+                _seg_end.real, _seg_end.imag))
         elif isinstance(segment, svgtools.CubicBezier):
             if useSandT and segment.is_smooth_from(previous_segment,
                                                    warning_on=False):
@@ -78,7 +80,8 @@ def path_to_rounded_d(path=svgtools.path,  useSandT=False, use_closed_attrib=Fal
                 args = (_seg_control1.real, _seg_control1.imag,
                         _seg_control2.real, _seg_control2.imag,
                         _seg_end.real, _seg_end.imag)
-                parts.append('C {:.2f},{:.2f} {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
+                parts.append(
+                    'C {:.2f},{:.2f} {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
         elif isinstance(segment, svgtools.QuadraticBezier):
             if useSandT and segment.is_smooth_from(previous_segment,
                                                    warning_on=False):
@@ -107,7 +110,8 @@ def path_to_rounded_d(path=svgtools.path,  useSandT=False, use_closed_attrib=Fal
             args = (segment.radius.real, segment.radius.imag,
                     segment.rotation, int(segment.large_arc),
                     int(segment.sweep), _seg_end.real, _seg_end.imag)
-            parts.append('A {:.2f},{:.2f} {:.2f} {:d},{:d} {:.2f},{:.2f}'.format(*args))
+            parts.append(
+                'A {:.2f},{:.2f} {:.2f} {:d},{:d} {:.2f},{:.2f}'.format(*args))
         current_pos = segment.end
         previous_segment = segment
 
@@ -299,17 +303,19 @@ class BezierAnimation:
                 second_circle_positions_y.append("%0.2lf" % (point2.imag))
 
             line = draw.Path(
-                "", fill="none", stroke=ORDER_COLOURS[order], stroke_opacity="20%", stroke_width=2, pathLength="10", stroke_linecap="round")
+                "", fill="none", stroke=ORDER_COLOURS[order], stroke_opacity="60%", stroke_width=1, pathLength="10", stroke_linecap="round")
             line.add_attribute_key_sequence("d", times, d_vals, animation_args={
                 "repeatCount": "indefinite"})
 
-            first_circle = draw.Circle(0, 0, 4, fill=ORDER_COLOURS[order])
+            first_circle = draw.Circle(
+                0, 0, 3, fill="none", stroke=ORDER_COLOURS[order], stroke_width=0.5)
             first_circle.add_attribute_key_sequence("cx", times, first_circle_positions_x, animation_args={
                 "repeatCount": "indefinite"})
             first_circle.add_attribute_key_sequence("cy", times, first_circle_positions_y, animation_args={
                 "repeatCount": "indefinite"})
 
-            second_circle = draw.Circle(0, 0, 4, fill=ORDER_COLOURS[order])
+            second_circle = draw.Circle(
+                0, 0, 3, fill="none", stroke=ORDER_COLOURS[order], stroke_width=0.5)
             second_circle.add_attribute_key_sequence("cx", times, second_circle_positions_x, animation_args={
                 "repeatCount": "indefinite"})
             second_circle.add_attribute_key_sequence("cy", times, second_circle_positions_y, animation_args={
@@ -349,13 +355,13 @@ class BezierAnimation:
             circle_positions_x.append("%0.2lf" % (point.real))
             circle_positions_y.append("%0.2lf" % (point.imag))
 
-        svg_path = draw.Path(path_to_rounded_d(bezier_path) , stroke="red",
+        svg_path = draw.Path(path_to_rounded_d(bezier_path), stroke="red",
                              stroke_width=2, fill="none", stroke_dasharray="100", stroke_dashoffset="100", pathLength="100", stroke_linecap="round")
 
         svg_path.add_attribute_key_sequence("stroke-dashoffset", times, dOffset, animation_args={
             "repeatCount": "indefinite"})
 
-        circle = draw.Circle(0, 0, 4, fill="black")
+        circle = draw.Circle(0, 0, 2.5, fill="black")
         circle.add_attribute_key_sequence("cx", times, circle_positions_x, animation_args={
             "repeatCount": "indefinite"})
         circle.add_attribute_key_sequence("cy", times, circle_positions_y, animation_args={
@@ -388,11 +394,26 @@ class BezierAnimation:
 
 
 if __name__ == "__main__":
-    test_bpoints = [200+100j,
-                    180+20j,
-                    280+20j,
-                    320+100j,
-                    360+40j]
+    b1_bpoints = [280+20j,
+                  380+100j]
+    b2_bpoints = [200+100j,
+                  280+20j,
+                  320+100j]
+    b3_bpoints = [200+100j,
+                  180+20j,
+                  280+20j,
+                  320+100j]
+    b4_bpoints = [200+100j,
+                  180+20j,
+                  280+20j,
+                  320+100j,
+                  360+40j]
 
-    b = BezierAnimation("Bézier 4 big.svg", 10.0, test_bpoints,
-                        resolution=1000, frame_count=100)
+    BezierAnimation("Bézier 1 big.svg", 6.0, b1_bpoints,
+                    resolution=1000, frame_count=100)
+    BezierAnimation("Bézier 2 big.svg", 10.0, b2_bpoints,
+                    resolution=1000, frame_count=100)
+    BezierAnimation("Bézier 3 big.svg", 10.0, b3_bpoints,
+                    resolution=1000, frame_count=100)
+    BezierAnimation("Bézier 4 big.svg", 10.0, b4_bpoints,
+                    resolution=1000, frame_count=100)
