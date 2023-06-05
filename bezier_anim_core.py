@@ -7,7 +7,7 @@ from random import randint
 ORDER_COLOURS = {
     7: "brown",
     6: "magenta",
-    5: "yellow",
+    5: "#008B8B",
     4: "#D16587",
     3: "blue",
     2: "green"
@@ -408,6 +408,12 @@ if __name__ == "__main__":
                   280+20j,
                   320+100j,
                   360+40j]
+    b5_bpoints = [0+200j,
+                  60+10j,
+                  110+160j,
+                  170+70j, 
+                  230+110j,
+                  170+160j]
 
     BezierAnimation("Bézier 1 big.svg", 6.0, b1_bpoints,
                     resolution=1000, frame_count=100)
@@ -416,4 +422,6 @@ if __name__ == "__main__":
     BezierAnimation("Bézier 3 big.svg", 10.0, b3_bpoints,
                     resolution=1000, frame_count=100)
     BezierAnimation("Bézier 4 big.svg", 10.0, b4_bpoints,
+                    resolution=1000, frame_count=100)
+    BezierAnimation("Bézier 5 big.svg", 10.0, b5_bpoints,
                     resolution=1000, frame_count=100)
