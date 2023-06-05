@@ -1,213 +1,38 @@
 import drawsvg as draw
 import svgpathtools as svgtools
-import numpy as np
+from bezier_anim_tools import path_to_rounded_d, path_from_polybezier
 from typing import *
 from random import randint
 
-ORDER_COLOURS = {
-    7: "brown",
-    6: "magenta",
-    5: "#008B8B",
-    4: "#D16587",
-    3: "blue",
-    2: "green"
-}
-
-
-def path_to_rounded_d(path=svgtools.path,  useSandT=False, use_closed_attrib=False, rel=False):
-    """Returns a path d-string for the path object.
-    For an explanation of useSandT and use_closed_attrib, see the
-    compatibility notes in the README."""
-    if len(path) == 0:
-        return ''
-    if use_closed_attrib:
-        self_closed = path.iscontinuous() and path.isclosed()
-        if self_closed:
-            segments = path[:-1]
-        else:
-            segments = path[:]
-    else:
-        self_closed = False
-        segments = path[:]
-
-    current_pos = None
-    parts = []
-    previous_segment = None
-    end = path[-1].end
-
-    for segment in segments:
-        seg_start = segment.start
-        # If the start of this segment does not coincide with the end of
-        # the last segment or if this segment is actually the close point
-        # of a closed path, then we should start a new subpath here.
-        if current_pos != seg_start or \
-                (self_closed and seg_start == end and use_closed_attrib):
-            if rel:
-                _seg_start = seg_start - current_pos if current_pos is not None else seg_start
-            else:
-                _seg_start = seg_start
-            parts.append('M {:.2f},{:.2f}'.format(
-                _seg_start.real, _seg_start.imag))
-
-        if isinstance(segment, svgtools.Line):
-            if rel:
-                _seg_end = segment.end - seg_start
-            else:
-                _seg_end = segment.end
-            parts.append('L {:.2f},{:.2f}'.format(
-                _seg_end.real, _seg_end.imag))
-        elif isinstance(segment, svgtools.CubicBezier):
-            if useSandT and segment.is_smooth_from(previous_segment,
-                                                   warning_on=False):
-                if rel:
-                    _seg_control2 = segment.control2 - seg_start
-                    _seg_end = segment.end - seg_start
-                else:
-                    _seg_control2 = segment.control2
-                    _seg_end = segment.end
-                args = (_seg_control2.real, _seg_control2.imag,
-                        _seg_end.real, _seg_end.imag)
-                parts.append('S {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
-            else:
-                if rel:
-                    _seg_control1 = segment.control1 - seg_start
-                    _seg_control2 = segment.control2 - seg_start
-                    _seg_end = segment.end - seg_start
-                else:
-                    _seg_control1 = segment.control1
-                    _seg_control2 = segment.control2
-                    _seg_end = segment.end
-                args = (_seg_control1.real, _seg_control1.imag,
-                        _seg_control2.real, _seg_control2.imag,
-                        _seg_end.real, _seg_end.imag)
-                parts.append(
-                    'C {:.2f},{:.2f} {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
-        elif isinstance(segment, svgtools.QuadraticBezier):
-            if useSandT and segment.is_smooth_from(previous_segment,
-                                                   warning_on=False):
-                if rel:
-                    _seg_end = segment.end - seg_start
-                else:
-                    _seg_end = segment.end
-                args = _seg_end.real, _seg_end.imag
-                parts.append('T {:.2f},{:.2f}'.format(*args))
-            else:
-                if rel:
-                    _seg_control = segment.control - seg_start
-                    _seg_end = segment.end - seg_start
-                else:
-                    _seg_control = segment.control
-                    _seg_end = segment.end
-                args = (_seg_control.real, _seg_control.imag,
-                        _seg_end.real, _seg_end.imag)
-                parts.append('Q {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
-
-        elif isinstance(segment, svgtools.Arc):
-            if rel:
-                _seg_end = segment.end - seg_start
-            else:
-                _seg_end = segment.end
-            args = (segment.radius.real, segment.radius.imag,
-                    segment.rotation, int(segment.large_arc),
-                    int(segment.sweep), _seg_end.real, _seg_end.imag)
-            parts.append(
-                'A {:.2f},{:.2f} {:.2f} {:d},{:d} {:.2f},{:.2f}'.format(*args))
-        current_pos = segment.end
-        previous_segment = segment
-
-    if self_closed:
-        parts.append('Z')
-
-    s = ' '.join(parts)
-    return s if not rel else s.lower()
-
-
-def text_sequence(container: draw.Drawing, times: List[float], values: List[str],
-                  *text_args, looping_anim: bool = False, kwargs_list=None, **text_kwargs):
-    if kwargs_list is None:
-        kwargs_list = [None] * len(values)
-
-    new_elements: List[draw.Text] = []
-
-    for val, current_kw in zip(values, kwargs_list):
-        kwargs = dict(text_kwargs)
-        if current_kw is not None:
-            kwargs.update(current_kw)
-        new_elements.append(draw.Text(val, *text_args, **kwargs))
-
-    for i, elem in enumerate(new_elements):
-        if elem is None:
-            continue
-
-        key_times = []
-        values = []
-
-        for j, time in enumerate(times):
-
-            key_times.append(time)
-
-            if i == j:
-                values.append("visible")
-            else:
-                values.append("hidden")
-
-        if looping_anim:
-            elem.add_attribute_key_sequence('visibility', key_times, values, animation_args={
-                                            "repeatCount": "indefinite"})
-        else:
-            elem.add_attribute_key_sequence('visibility', key_times, values)
-
-    container.extend(new_elements)
-
-
-def path_from_polybezier(bpoints: List[complex], resolution: int) -> svgtools.Path:
-    curves = [bpoints]
-
-    max_len_sublist = max(map(len, curves))
-
-    while max_len_sublist > 4:
-        new_curves = []
-
-        for curve_bpoints in curves:
-            left_curve_bpoints, right_curve_bpoints = svgtools.split_bezier(
-                curve_bpoints, 0.5)
-
-            new_curves.append(left_curve_bpoints)
-            new_curves.append(right_curve_bpoints)
-
-        curves = new_curves
-
-        if len(curves) > resolution:
-            for i in range(0, len(curves)):
-                while len(curves[i]) > 4:
-                    curves[i].pop(randint(1, len(curves[i]) - 2))
-
-        max_len_sublist = max(map(len, curves))
-
-    bezier_path = svgtools.Path()
-
-    for i, curve_bpoints in enumerate(curves):
-        bezier_path.insert(i, svgtools.bpoints2bezier(curve_bpoints))
-
-    return bezier_path
-
 
 class BezierAnimation:
-    def __init__(self, filename: str, dur: float, bpoints: List[complex], resolution: int = 10, frame_count: int = 100, bg: str = "white") -> None:
+    def __init__(self, filename: str, dur: float, bpoints: List[complex], resolution: int = 10, frame_count: int = 100, bg: str = "white", order_colours: List[str] = []) -> None:
+        if len(order_colours) == 0:
+            self.ORDER_COLOURS = {
+                7: "brown",
+                6: "magenta",
+                5: "#008B8B",
+                4: "#D16587",
+                3: "blue",
+                2: "green"
+            }
+        else:
+            self.ORDER_COLOURS = order_colours
+
         self.bpoints: List[complex] = bpoints
         self.filename: str = filename
         self.dur: float = dur
         self.resolution: int = resolution
         self.frame_count: int = frame_count
 
-        self.calculate_windowsize()
+        self.calculate_drawingsize()
 
         self.d: draw.Drawing = draw.Drawing(
             self.WIDTH, self.HEIGHT, self.ORIGIN)
 
         # Background
         self.d.append(draw.Rectangle(
-            self.ORIGIN[0], self.ORIGIN[1], self.WIDTH, self.HEIGHT, fill=bg))  
+            self.ORIGIN[0], self.ORIGIN[1], self.WIDTH, self.HEIGHT, fill=bg))
 
         self.render()
 
@@ -217,12 +42,15 @@ class BezierAnimation:
 
         self.generate_structure()
 
-        self.generate_red_bezier()
+        self.generate_main_bezier()
         self.generate_counter()
 
         self.d.save_svg(self.filename)
 
     def generate_greys(self):
+        """
+        Generates grey lines between bpoints
+        """
         for point_i, bpoint in enumerate(self.bpoints):
             if not point_i >= len(self.bpoints) - 1:
                 grey_line = draw.Line(
@@ -230,6 +58,9 @@ class BezierAnimation:
                 self.d.append(grey_line)
 
     def generate_points(self):
+        """
+        Generates circles and labels (P0, P1, etc..) for bpoints  
+        """
         for point_i, bpoint in enumerate(self.bpoints):
             p_circle = draw.Circle(bpoint.real, bpoint.imag, 5, stroke="black",
                                    stroke_width=2, fill="none")
@@ -241,6 +72,9 @@ class BezierAnimation:
             self.d.append(p_text)
 
     def generate_counter(self):
+        """
+        Generates the 't' counter using key frames for visibility
+        """
         # Counter x should be in the middle between the farmost point on the L/R sides
         counter_x = self.ORIGIN[0] + self.WIDTH/2
         counter_y = self.max_y + 20
@@ -270,12 +104,17 @@ class BezierAnimation:
             self.d.append(new_text)
 
     def generate_structure(self):
+        """
+        Generates an animated structure of the background 'builder' circles and lines for the main bezier
+        """
         def recursive_generate(b_points):
             order = len(b_points) - 1
 
+            # Base case: Order <= 1 so nothing needs to be generated
             if order <= 1:
                 return
 
+            # Call recursive function
             recursive_generate(b_points[:-1])
             recursive_generate(b_points[1:])
 
@@ -307,19 +146,19 @@ class BezierAnimation:
                 second_circle_positions_y.append("%0.2lf" % (point2.imag))
 
             line = draw.Path(
-                "", fill="none", stroke=ORDER_COLOURS[order], stroke_opacity="60%", stroke_width=1, pathLength="10", stroke_linecap="round")
+                "", fill="none", stroke=self.ORDER_COLOURS[order], stroke_opacity="60%", stroke_width=1, pathLength="10", stroke_linecap="round")
             line.add_attribute_key_sequence("d", times, d_vals, animation_args={
                 "repeatCount": "indefinite"})
 
             first_circle = draw.Circle(
-                0, 0, 3, fill="none", stroke=ORDER_COLOURS[order], stroke_width=0.5)
+                0, 0, 3, fill="none", stroke=self.ORDER_COLOURS[order], stroke_width=0.5)
             first_circle.add_attribute_key_sequence("cx", times, first_circle_positions_x, animation_args={
                 "repeatCount": "indefinite"})
             first_circle.add_attribute_key_sequence("cy", times, first_circle_positions_y, animation_args={
                 "repeatCount": "indefinite"})
 
             second_circle = draw.Circle(
-                0, 0, 3, fill="none", stroke=ORDER_COLOURS[order], stroke_width=0.5)
+                0, 0, 3, fill="none", stroke=self.ORDER_COLOURS[order], stroke_width=0.5)
             second_circle.add_attribute_key_sequence("cx", times, second_circle_positions_x, animation_args={
                 "repeatCount": "indefinite"})
             second_circle.add_attribute_key_sequence("cy", times, second_circle_positions_y, animation_args={
@@ -331,7 +170,10 @@ class BezierAnimation:
 
         recursive_generate(self.bpoints)
 
-    def generate_red_bezier(self):
+    def generate_main_bezier(self):
+        """
+        Generates the main Bezier curve using the given bpoints
+        """
         bezier_path = path_from_polybezier(self.bpoints, self.resolution)
 
         times, dOffset = [], []
@@ -374,7 +216,11 @@ class BezierAnimation:
         self.d.append(svg_path)
         self.d.append(circle)
 
-    def calculate_windowsize(self):
+    def calculate_drawingsize(self):
+        """
+        Calculates the size of the drawing based on the min and max x and y
+        values in the bpoints
+        """
         self.WIDTH: float = 0
         self.HEIGHT: float = 0
         self.ORIGIN: Tuple[float, float] = (0, 0)
