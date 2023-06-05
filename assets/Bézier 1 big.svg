@@ -3,6 +3,7 @@
      width="200.0" height="180.0" viewBox="230.0 -30.0 200.0 180.0">
 <defs>
 </defs>
+<rect x="230.0" y="-30.0" width="200.0" height="180.0" fill="white" />
 <path d="M280.0,20.0 L380.0,100.0" stroke="#D3D3D3" stroke-width="4" pathLength="10" stroke-linecap="round" />
 <circle cx="280.0" cy="20.0" r="5" stroke="black" stroke-width="2" fill="none" />
 <text x="290.0" y="20.0" font-size="15">P<tspan baseline-shift="sub" font-size="10">0</tspan></text>

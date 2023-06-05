@@ -193,7 +193,7 @@ def path_from_polybezier(bpoints: List[complex], resolution: int) -> svgtools.Pa
 
 
 class BezierAnimation:
-    def __init__(self, filename: str, dur: float, bpoints: List[complex], resolution: int = 10, frame_count: int = 100) -> None:
+    def __init__(self, filename: str, dur: float, bpoints: List[complex], resolution: int = 10, frame_count: int = 100, bg: str = "white") -> None:
         self.bpoints: List[complex] = bpoints
         self.filename: str = filename
         self.dur: float = dur
@@ -204,6 +204,10 @@ class BezierAnimation:
 
         self.d: draw.Drawing = draw.Drawing(
             self.WIDTH, self.HEIGHT, self.ORIGIN)
+
+        # Background
+        self.d.append(draw.Rectangle(
+            self.ORIGIN[0], self.ORIGIN[1], self.WIDTH, self.HEIGHT, fill=bg))  
 
         self.render()
 
@@ -411,7 +415,7 @@ if __name__ == "__main__":
     b5_bpoints = [0+200j,
                   60+10j,
                   110+160j,
-                  170+70j, 
+                  170+70j,
                   230+110j,
                   170+160j]
 
