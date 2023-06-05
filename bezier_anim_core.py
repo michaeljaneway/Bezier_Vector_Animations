@@ -86,7 +86,7 @@ class BezierAnimation:
         for i in range(0, self.frame_count + 1):
             t = (i/self.frame_count)
             time = t * self.dur
-            counter_value = "t=" + str(t).removeprefix("0")
+            counter_value = "t=" + str("%0.2f" % (t)).removeprefix("0")
 
             times.append(time)
             counter_values.append(counter_value)
