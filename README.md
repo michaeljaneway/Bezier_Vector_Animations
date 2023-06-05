@@ -1,4 +1,4 @@
-![svgbezier logo](https://raw.githubusercontent.com/michaeljaneway/Wiki-Anims/61c841a55d6542331160910dc59715022f910bb4/assets/B%C3%A9zier%205%20big.svg?token=GHSAT0AAAAAACDHTOZV4HPYCKBVRZMDPVOYZD6A7JA)
+![svgbezier logo] (https://github.com/michaeljaneway/Wiki-Anims/blob/master/assets/B%C3%A9zier%205%20big.svg)
 
 # Animated SVG Bezier Curve Generator
 
