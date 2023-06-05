@@ -12,7 +12,8 @@ https://en.wikipedia.org/wiki/B%C3%A9zier_curve
 b1_bpoints = [280+20j,
               380+100j]
 
-BezierAnimation("Bézier 1 big.svg", 6.0, b1_bpoints, resolution=1000, frame_count=100)
+BezierAnimation("Bézier 1 big.svg", 6.0, b1_bpoints,
+                    resolution=1000, frame_count=100)
 ```
 
 ![svgbezier logo](https://github.com/michaeljaneway/Wiki-Anims/blob/master/assets/B%C3%A9zier%202%20big.svg)
@@ -43,7 +44,7 @@ b4_bpoints = [200+100j,
               280+20j,
               320+100j,
               360+40j]
-              
+
 BezierAnimation("Bézier 4 big.svg", 10.0, b4_bpoints,
                     resolution=1000, frame_count=100)
 
