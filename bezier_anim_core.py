@@ -14,6 +14,110 @@ ORDER_COLOURS = {
 }
 
 
+def path_to_rounded_d(path=svgtools.path,  useSandT=False, use_closed_attrib=False, rel=False):
+    """Returns a path d-string for the path object.
+    For an explanation of useSandT and use_closed_attrib, see the
+    compatibility notes in the README."""
+    if len(path) == 0:
+        return ''
+    if use_closed_attrib:
+        self_closed = path.iscontinuous() and path.isclosed()
+        if self_closed:
+            segments = path[:-1]
+        else:
+            segments = path[:]
+    else:
+        self_closed = False
+        segments = path[:]
+
+    current_pos = None
+    parts = []
+    previous_segment = None
+    end = path[-1].end
+
+    for segment in segments:
+        seg_start = segment.start
+        # If the start of this segment does not coincide with the end of
+        # the last segment or if this segment is actually the close point
+        # of a closed path, then we should start a new subpath here.
+        if current_pos != seg_start or \
+                (self_closed and seg_start == end and use_closed_attrib):
+            if rel:
+                _seg_start = seg_start - current_pos if current_pos is not None else seg_start
+            else:
+                _seg_start = seg_start
+            parts.append('M {:.2f},{:.2f}'.format(_seg_start.real, _seg_start.imag))
+
+        if isinstance(segment, svgtools.Line):
+            if rel:
+                _seg_end = segment.end - seg_start
+            else:
+                _seg_end = segment.end
+            parts.append('L {:.2f},{:.2f}'.format(_seg_end.real, _seg_end.imag))
+        elif isinstance(segment, svgtools.CubicBezier):
+            if useSandT and segment.is_smooth_from(previous_segment,
+                                                   warning_on=False):
+                if rel:
+                    _seg_control2 = segment.control2 - seg_start
+                    _seg_end = segment.end - seg_start
+                else:
+                    _seg_control2 = segment.control2
+                    _seg_end = segment.end
+                args = (_seg_control2.real, _seg_control2.imag,
+                        _seg_end.real, _seg_end.imag)
+                parts.append('S {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
+            else:
+                if rel:
+                    _seg_control1 = segment.control1 - seg_start
+                    _seg_control2 = segment.control2 - seg_start
+                    _seg_end = segment.end - seg_start
+                else:
+                    _seg_control1 = segment.control1
+                    _seg_control2 = segment.control2
+                    _seg_end = segment.end
+                args = (_seg_control1.real, _seg_control1.imag,
+                        _seg_control2.real, _seg_control2.imag,
+                        _seg_end.real, _seg_end.imag)
+                parts.append('C {:.2f},{:.2f} {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
+        elif isinstance(segment, svgtools.QuadraticBezier):
+            if useSandT and segment.is_smooth_from(previous_segment,
+                                                   warning_on=False):
+                if rel:
+                    _seg_end = segment.end - seg_start
+                else:
+                    _seg_end = segment.end
+                args = _seg_end.real, _seg_end.imag
+                parts.append('T {:.2f},{:.2f}'.format(*args))
+            else:
+                if rel:
+                    _seg_control = segment.control - seg_start
+                    _seg_end = segment.end - seg_start
+                else:
+                    _seg_control = segment.control
+                    _seg_end = segment.end
+                args = (_seg_control.real, _seg_control.imag,
+                        _seg_end.real, _seg_end.imag)
+                parts.append('Q {:.2f},{:.2f} {:.2f},{:.2f}'.format(*args))
+
+        elif isinstance(segment, svgtools.Arc):
+            if rel:
+                _seg_end = segment.end - seg_start
+            else:
+                _seg_end = segment.end
+            args = (segment.radius.real, segment.radius.imag,
+                    segment.rotation, int(segment.large_arc),
+                    int(segment.sweep), _seg_end.real, _seg_end.imag)
+            parts.append('A {:.2f},{:.2f} {:.2f} {:d},{:d} {:.2f},{:.2f}'.format(*args))
+        current_pos = segment.end
+        previous_segment = segment
+
+    if self_closed:
+        parts.append('Z')
+
+    s = ' '.join(parts)
+    return s if not rel else s.lower()
+
+
 def text_sequence(container: draw.Drawing, times: List[float], values: List[str],
                   *text_args, looping_anim: bool = False, kwargs_list=None, **text_kwargs):
     if kwargs_list is None:
@@ -131,9 +235,9 @@ class BezierAnimation:
     def generate_counter(self):
         # Counter x should be in the middle between the farmost point on the L/R sides
         counter_x = self.ORIGIN[0] + self.WIDTH/2
-        counter_y = self.HEIGHT - 100
+        counter_y = self.max_y + 20
         font_size = 10
-        
+
         # Create times and values lists
         times, counter_values = [], []
 
@@ -147,14 +251,14 @@ class BezierAnimation:
 
         for i, value in enumerate(counter_values):
             new_text = draw.Text(value, font_size, counter_x, counter_y)
-            
+
             new_text.add_key_frame(0, visibility="hidden", animation_args={
-                                "repeatCount": "indefinite"})
+                "repeatCount": "indefinite"})
             new_text.add_key_frame(times[i], visibility="visible")
             if i != len(counter_values) - 1:
                 new_text.add_key_frame(times[i+1], visibility="hidden")
             new_text.add_key_frame(self.dur, visibility="hidden")
-            
+
             self.d.append(new_text)
 
     def generate_structure(self):
@@ -226,7 +330,7 @@ class BezierAnimation:
         for i in range(0, self.frame_count + 1):
             t = (i/self.frame_count)
             time = t * self.dur
-            
+
             times.append(time)
 
             point: complex = svgtools.bezier_point(self.bpoints, t)
@@ -245,7 +349,7 @@ class BezierAnimation:
             circle_positions_x.append("%0.2lf" % (point.real))
             circle_positions_y.append("%0.2lf" % (point.imag))
 
-        svg_path = draw.Path(bezier_path.d(), stroke="red",
+        svg_path = draw.Path(path_to_rounded_d(bezier_path) , stroke="red",
                              stroke_width=2, fill="none", stroke_dasharray="100", stroke_dashoffset="100", pathLength="100", stroke_linecap="round")
 
         svg_path.add_attribute_key_sequence("stroke-dashoffset", times, dOffset, animation_args={
@@ -265,32 +369,30 @@ class BezierAnimation:
         self.HEIGHT: float = 0
         self.ORIGIN: Tuple[float, float] = (0, 0)
 
-        min_x, min_y = None, None
-        max_x, max_y = None, None
+        self.min_x, self.min_y = None, None
+        self.max_x, self.max_y = None, None
 
         for bpoint in self.bpoints:
-            if min_x == None or float(bpoint.real) < min_x:
-                min_x = float(bpoint.real)
-            if min_y == None or float(bpoint.imag) < min_y:
-                min_y = float(bpoint.imag)
-            if max_x == None or float(bpoint.real) > max_x:
-                max_x = float(bpoint.real)
-            if max_y == None or float(bpoint.imag) > max_y:
-                max_y = float(bpoint.imag)
+            if self.min_x == None or float(bpoint.real) < self.min_x:
+                self.min_x = float(bpoint.real)
+            if self.min_y == None or float(bpoint.imag) < self.min_y:
+                self.min_y = float(bpoint.imag)
+            if self.max_x == None or float(bpoint.real) > self.max_x:
+                self.max_x = float(bpoint.real)
+            if self.max_y == None or float(bpoint.imag) > self.max_y:
+                self.max_y = float(bpoint.imag)
 
-        self.ORIGIN = (min_x - 50, min_y - 50)
-        self.WIDTH = abs(max_x - min_x) + 100
-        self.HEIGHT = abs(max_y - min_y) + 100
+        self.ORIGIN = (self.min_x - 50, self.min_y - 50)
+        self.WIDTH = abs(self.max_x - self.min_x) + 100
+        self.HEIGHT = abs(self.max_y - self.min_y) + 100
 
 
 if __name__ == "__main__":
-    test_bpoints = [200+200j,
-                    250+0j,
-                    300+100j,
-                    350+90j,
-                    400+110j,
-                    500+0j,
-                    650+200j]
+    test_bpoints = [200+100j,
+                    180+20j,
+                    280+20j,
+                    320+100j,
+                    360+40j]
 
-    b = BezierAnimation("bezier 4.svg", 10.0, test_bpoints,
-                        resolution=100, frame_count=100)
+    b = BezierAnimation("Bézier 4 big.svg", 10.0, test_bpoints,
+                        resolution=1000, frame_count=100)
