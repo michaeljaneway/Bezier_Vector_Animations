@@ -14,6 +14,44 @@ ORDER_COLOURS = {
 }
 
 
+def text_sequence(container: draw.Drawing, times: List[float], values: List[str],
+                  *text_args, looping_anim: bool = False, kwargs_list=None, **text_kwargs):
+    if kwargs_list is None:
+        kwargs_list = [None] * len(values)
+
+    new_elements: List[draw.Text] = []
+
+    for val, current_kw in zip(values, kwargs_list):
+        kwargs = dict(text_kwargs)
+        if current_kw is not None:
+            kwargs.update(current_kw)
+        new_elements.append(draw.Text(val, *text_args, **kwargs))
+
+    for i, elem in enumerate(new_elements):
+        if elem is None:
+            continue
+
+        key_times = []
+        values = []
+
+        for j, time in enumerate(times):
+
+            key_times.append(time)
+
+            if i == j:
+                values.append("visible")
+            else:
+                values.append("hidden")
+
+        if looping_anim:
+            elem.add_attribute_key_sequence('visibility', key_times, values, animation_args={
+                                            "repeatCount": "indefinite"})
+        else:
+            elem.add_attribute_key_sequence('visibility', key_times, values)
+
+    container.extend(new_elements)
+
+
 def path_from_polybezier(bpoints: List[complex], resolution: int) -> svgtools.Path:
     curves = [bpoints]
 
@@ -91,6 +129,11 @@ class BezierAnimation:
             self.d.append(p_text)
 
     def generate_counter(self):
+        # Counter x should be in the middle between the farmost point on the L/R sides
+        counter_x = self.ORIGIN[0] + self.WIDTH/2
+        counter_y = self.HEIGHT - 100
+        font_size = 10
+        
         # Create times and values lists
         times, counter_values = [], []
 
@@ -102,13 +145,17 @@ class BezierAnimation:
             times.append(time)
             counter_values.append(counter_value)
 
-        # Counter x should be in the middle between the farmost point on the L/R sides
-        counter_x = self.ORIGIN[0] + abs(self.ORIGIN[0] - self.WIDTH)/2
-
-        # Animate counter
-        draw.native_animation.animate_text_sequence(self.d, times,
-                                                    counter_values,
-                                                    10, counter_x, self.HEIGHT - 50, fill='black', center=True, looping_anim=True)
+        for i, value in enumerate(counter_values):
+            new_text = draw.Text(value, font_size, counter_x, counter_y)
+            
+            new_text.add_key_frame(0, visibility="hidden", animation_args={
+                                "repeatCount": "indefinite"})
+            new_text.add_key_frame(times[i], visibility="visible")
+            if i != len(counter_values) - 1:
+                new_text.add_key_frame(times[i+1], visibility="hidden")
+            new_text.add_key_frame(self.dur, visibility="hidden")
+            
+            self.d.append(new_text)
 
     def generate_structure(self):
         def recursive_generate(b_points):
@@ -116,50 +163,39 @@ class BezierAnimation:
 
             if order <= 1:
                 return
-            
+
             recursive_generate(b_points[:-1])
             recursive_generate(b_points[1:])
 
             # First Circle Array: b_points[:-1]
             # Second Circle Array: b_points[1:]
 
-            first_tools_path = path_from_polybezier(
-                b_points[:-1], self.resolution)
-            second_tools_path = path_from_polybezier(
-                b_points[1:], self.resolution)
-
-            first_path = draw.Path(first_tools_path.d())
-            second_path = draw.Path(second_tools_path.d())
-
-            def d_at_t(t: float):
-                point1: complex = first_tools_path.point(t)
-                point2: complex = second_tools_path.point(t)
-
             times, d_vals = [], []
-            first_circle_positions_x, second_circle_positions_x = [],[]
-            first_circle_positions_y, second_circle_positions_y = [],[]
+            first_circle_positions_x, second_circle_positions_x = [], []
+            first_circle_positions_y, second_circle_positions_y = [], []
 
             for i in range(0, self.frame_count + 1):
                 t = (i/self.frame_count)
                 time = t * self.dur
 
-                point1: complex = first_tools_path.point(t)
-                point2: complex = second_tools_path.point(t)
+                point1: complex = svgtools.bezier_point(b_points[:-1], t)
+                point2: complex = svgtools.bezier_point(b_points[1:], t)
 
-                d_val = "M%lf,%lf L%lf,%lf" % (
+                d_val = "M%0.2lf,%0.2lf L%0.2lf,%0.2lf" % (
                     point1.real, point1.imag, point2.real, point2.imag)
 
                 times.append(time)
-                d_vals.append(d_val)
-                
-                first_circle_positions_x.append(point1.real)
-                first_circle_positions_y.append(point1.imag)
-                
-                second_circle_positions_x.append(point2.real)
-                second_circle_positions_y.append(point2.imag)
 
-            line = draw.Path(d_at_t(
-                0), fill="none", stroke=ORDER_COLOURS[order], stroke_opacity="20%", stroke_width=2, pathLength="10", stroke_linecap="round")
+                d_vals.append(d_val)
+
+                first_circle_positions_x.append("%0.2lf" % (point1.real))
+                first_circle_positions_y.append("%0.2lf" % (point1.imag))
+
+                second_circle_positions_x.append("%0.2lf" % (point2.real))
+                second_circle_positions_y.append("%0.2lf" % (point2.imag))
+
+            line = draw.Path(
+                "", fill="none", stroke=ORDER_COLOURS[order], stroke_opacity="20%", stroke_width=2, pathLength="10", stroke_linecap="round")
             line.add_attribute_key_sequence("d", times, d_vals, animation_args={
                 "repeatCount": "indefinite"})
 
@@ -179,21 +215,50 @@ class BezierAnimation:
             self.d.append(second_circle)
             self.d.append(line)
 
-            
-
         recursive_generate(self.bpoints)
 
     def generate_red_bezier(self):
         bezier_path = path_from_polybezier(self.bpoints, self.resolution)
 
+        times, dOffset = [], []
+        circle_positions_x, circle_positions_y = [], []
+
+        for i in range(0, self.frame_count + 1):
+            t = (i/self.frame_count)
+            time = t * self.dur
+            
+            times.append(time)
+
+            point: complex = svgtools.bezier_point(self.bpoints, t)
+
+            T = bezier_path.t2T(
+                svgtools.closest_point_in_path(point, bezier_path)[2], t)
+
+            percent_line_draw = 100 - \
+                (100 * ((bezier_path.length(0, T) / bezier_path.length(0, 1))))
+
+            if t != 0:
+                dOffset.append("%0.2lf" % (percent_line_draw))
+            else:
+                dOffset.append("100.00")
+
+            circle_positions_x.append("%0.2lf" % (point.real))
+            circle_positions_y.append("%0.2lf" % (point.imag))
+
         svg_path = draw.Path(bezier_path.d(), stroke="red",
                              stroke_width=2, fill="none", stroke_dasharray="100", stroke_dashoffset="100", pathLength="100", stroke_linecap="round")
 
-        svg_path.add_key_frame(0, stroke_dashoffset="100", animation_args={
-                               "repeatCount": "indefinite"})
-        svg_path.add_key_frame(self.dur, stroke_dashoffset="0")
+        svg_path.add_attribute_key_sequence("stroke-dashoffset", times, dOffset, animation_args={
+            "repeatCount": "indefinite"})
+
+        circle = draw.Circle(0, 0, 4, fill="black")
+        circle.add_attribute_key_sequence("cx", times, circle_positions_x, animation_args={
+            "repeatCount": "indefinite"})
+        circle.add_attribute_key_sequence("cy", times, circle_positions_y, animation_args={
+            "repeatCount": "indefinite"})
 
         self.d.append(svg_path)
+        self.d.append(circle)
 
     def calculate_windowsize(self):
         self.WIDTH: float = 0
@@ -219,7 +284,13 @@ class BezierAnimation:
 
 
 if __name__ == "__main__":
-    test_bpoints = [200+200j, 250+0j, 300+100j, 350+90j, 400+110j, 340+200j]
+    test_bpoints = [200+200j,
+                    250+0j,
+                    300+100j,
+                    350+90j,
+                    400+110j,
+                    500+0j,
+                    650+200j]
 
     b = BezierAnimation("bezier 4.svg", 10.0, test_bpoints,
-                        resolution=1000, frame_count=100)
+                        resolution=100, frame_count=100)
